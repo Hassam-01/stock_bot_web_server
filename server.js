@@ -13,7 +13,9 @@ const supabase = createClient(supaBaseUrl, supaBaseKey);
 const app = express();
 
 app.use(cors({
-  origin: process.env.REACT_APP_FRONTEND_URL, // Allow requests from your frontend
+  // origin: process.env.REACT_APP_FRONTEND_URL, // Allow requests from your frontend
+  // allow all origin
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow specific HTTP methods
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
