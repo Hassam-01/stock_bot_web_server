@@ -30,7 +30,6 @@ app.get('/', (req, res) => {
 // Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  console.log("htiii")
 
   try {
     const { data: user, error } = await supabase
@@ -89,7 +88,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Recommendation endpoint
 app.post('/api/recommendation', async (req, res) => {
   try {
-    const response = await axios.post('http://localhost:5000/api/signal/recommendation', req.body);
+    const response = await axios.post('https://stock-bot-9kw6.onrender.com/api/signal/recommendation', req.body);
     res.json(response.data);
   } catch (error) {
     console.error('Error in forwarding request:', error);
@@ -180,7 +179,7 @@ app.post('/api/trade/:user_id/buy', async (req, res) => {
 app.post('/api/trade/:user_id/sell', async (req, res) => {
   const { sellPrice: price, sellQuantity: quantity, sellDate: date, sellTicker: ticker, sellStockId: stock_id, sellPriceId: price_id } = req.body.dataSend[0];
   const user_id = req.params.user_id;
-
+  console.log(req.body.dataSend[0], "dataSend")
   const transaction_type = 'sell';
 
   try {
@@ -205,9 +204,18 @@ app.post('/api/trade/:user_id/sell', async (req, res) => {
         transaction_date: date,
       });
 
+    // select the qunaity of the stock
+    const { data: asset, error: assetError } = await supabase
+      .from('assets')
+      .select('quantity')
+      .eq('price_id', price_id)
+      .single();
+
+    const newQuantity = asset.quantity - Number(quantity);
+    // update the quantity of the stock
     await supabase
       .from('assets')
-      .update({ quantity: quantity - 1 }) // Example logic
+      .update({ quantity: newQuantity })
       .eq('price_id', price_id);
 
     return res.status(201).json({ message: 'Sell Trade Successful' });
