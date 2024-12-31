@@ -133,16 +133,58 @@ app.post('/api/trade/:user_id/buy', async (req, res) => {
     }
 
     // Insert stock price
-    const { data: stockPrice, error: priceError } = await supabase
+    let stockPrice;
+    const { data: existingPrice, error: existingPriceError } = await supabase
+      .from('stock_prices')
+      .select('*')
+      .eq('stock_id', stock.stock_id)
+      .eq('price', price)
+      .eq('price_date', date)
+      .single();
+
+    if (existingPriceError) {
+      throw existingPriceError;
+    }
+
+    if (existingPrice) {
+      stockPrice = existingPrice;
+    } else {
+      const { data: newStockPrice, error: newPriceError } = await supabase
       .from('stock_prices')
       .insert({ stock_id: stock.stock_id, price, price_date: date })
       .select('*')
       .single();
 
-    if (priceError) throw priceError;
+      if (newPriceError) {
+      throw newPriceError;
+      }
 
-    // Insert asset
-    await supabase
+      stockPrice = newStockPrice;
+    }
+
+    // Check if asset exists
+    const { data: existingAsset, error: existingAssetError } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('user_id', user_id)
+      .eq('price_id', stockPrice.price_id)
+      .single();
+
+    if (existingAssetError) {
+      throw existingAssetError;
+    }
+
+    if (existingAsset) {
+      // Update the quantity of the existing asset
+      const newQuantity = existingAsset.quantity + quantity;
+      await supabase
+      .from('assets')
+      .update({ quantity: newQuantity })
+      .eq('price_id', stockPrice.price_id)
+      .eq('user_id', user_id);
+    } else {
+      // Insert new asset
+      await supabase
       .from('assets')
       .insert({
         user_id,
@@ -150,6 +192,7 @@ app.post('/api/trade/:user_id/buy', async (req, res) => {
         price_id: stockPrice.price_id,
         quantity,
       });
+    }
 
     // Insert transaction
     await supabase
