@@ -111,69 +111,57 @@ app.post('/api/trade/:user_id/buy', async (req, res) => {
     if (userError || !user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
     // Fetch or insert stock
     const { data: existingStock } = await supabase
-      .from('stocks')
-      .select('*')
-      .eq('ticker', ticker)
-      .single();
-
+    .from('stocks')
+    .select('*')
+    .eq('ticker', ticker)
+    .single();
+    
     let stock = existingStock;
-
+    
     if (!stock) {
       const { data: newStock, error: newStockError } = await supabase
-        .from('stocks')
-        .insert({ ticker, company_name: ticker })
-        .select('*')
-        .single();
-
+      .from('stocks')
+      .insert({ ticker, company_name: ticker })
+      .select('*')
+      .single();
+      
       if (newStockError) throw newStockError;
       stock = newStock;
     }
-
+    
     // Insert stock price
     let stockPrice;
-    const { data: existingPrice, error: existingPriceError } = await supabase
-      .from('stock_prices')
-      .select('*')
-      .eq('stock_id', stock.stock_id)
-      .eq('price', price)
-      .eq('price_date', date)
-      .single();
-
-    if (existingPriceError) {
-      throw existingPriceError;
-    }
-
+    const { data: existingPrice } = await supabase
+    .from('stock_prices')
+    .select('*')
+    .eq('stock_id', stock.stock_id)
+    .eq('price', price)
+    .eq('price_date', date)
+    .single();
+    
     if (existingPrice) {
-      stockPrice = existingPrice;
+      stockPrice = Array.isArray(existingPrice) ? existingPrice[0] : existingPrice;
     } else {
       const { data: newStockPrice, error: newPriceError } = await supabase
       .from('stock_prices')
       .insert({ stock_id: stock.stock_id, price, price_date: date })
       .select('*')
       .single();
-
-      if (newPriceError) {
-      throw newPriceError;
-      }
-
       stockPrice = newStockPrice;
     }
-
+    
     // Check if asset exists
     const { data: existingAsset, error: existingAssetError } = await supabase
-      .from('assets')
-      .select('*')
-      .eq('user_id', user_id)
-      .eq('price_id', stockPrice.price_id)
-      .single();
+    .from('assets')
+    .select('*')
+    .eq('user_id', user_id)
+    .eq('price_id', stockPrice.price_id)
+    .single();
+    
 
-    if (existingAssetError) {
-      throw existingAssetError;
-    }
-
+    
     if (existingAsset) {
       // Update the quantity of the existing asset
       const newQuantity = existingAsset.quantity + quantity;
@@ -193,24 +181,24 @@ app.post('/api/trade/:user_id/buy', async (req, res) => {
         quantity,
       });
     }
-
+    
     // Insert transaction
     await supabase
-      .from('transactions')
-      .insert({
-        user_id,
-        stock_id: stock.stock_id,
-        transaction_type,
-        quantity,
-        price,
-        transaction_date: date,
-      });
-
+    .from('transactions')
+    .insert({
+      user_id,
+      stock_id: stock.stock_id,
+      transaction_type,
+      quantity,
+      price,
+      transaction_date: date,
+    });
+    
     await supabase
-      .from('users')
-      .update({ total_investment: user.total_investment - quantity * price })
-      .eq('user_id', user_id);
-
+    .from('users')
+    .update({ total_investment: user.total_investment - quantity * price })
+    .eq('user_id', user_id);
+    
     return res.status(201).json({ message: 'Buy Trade Successful' });
   } catch (err) {
     console.error(err);
